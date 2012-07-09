@@ -1,0 +1,20 @@
+
+Fix a few issues and add features:
+ - create data bag for builds that allows one to manage a Jenkins job
+   that creates an EC2 instance configure via a set of Chef roles for
+   deployment and testing
+ - add job creation/updates to the default recipe via data bag mechanism
+ - add "update-job" Jenkins CLI capability to the job resource
+ - add HTTP Basic Auth support to nginx proxy
+ - fix issues relating to ubuntu support including:
+   - make the jenkins service start at the end of installation
+   - update the apt packages after adding the jenkins debian repository
+   - supply a correct JAVA_HOME to the jenkins upstart configuration file
+     /etc/init/jenkins.conf, as well as support changing the port that
+     jenkins listens on
+   - configure jenkins for the location of the maven installation if the
+     maven recipe is installed
+ - add nginx as a dependency
+ - correct README on attributes for proxy variants
+
+

@@ -1,0 +1,9 @@
+
+does nginx & apache need to be dependencies or can they be recommends
+test with lack of maven
+test basic auth
+test on non-Ubuntu
+test on latest ubuntu
+test different port
+test whether data bag attributes can be optional
+
