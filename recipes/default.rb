@@ -75,14 +75,20 @@ when "ubuntu", "debian"
   include_recipe "java"
 
   pid_file = "/var/run/jenkins/jenkins.pid"
-  install_starts_service = true
+  install_starts_service = false
 
   apt_repository "jenkins" do
     uri "#{node.jenkins.package_url}/debian"
     components %w[binary/]
     key "http://pkg.jenkins-ci.org/debian/jenkins-ci.org.key"
-    action :add
+    #action :add
   end
+  cookbook_file "/etc/apt/sources.list.d/jenkins.list" do
+    mode        '0644'
+    source "jenkins.list"
+    notifies :run, resources(:execute => "apt-get update"), :immediately
+  end
+
 when "centos", "redhat"
   include_recipe "yum"
 
@@ -118,6 +124,7 @@ ruby_block "netstat" do
   end
   action :nothing
 end
+
 
 service "jenkins" do
   supports [ :stop, :start, :restart, :status ]
@@ -156,9 +163,36 @@ end
 
 template "/etc/default/jenkins"
 
+template "/etc/init/jenkins.conf" do
+  source      "jenkins.conf.erb"
+  owner       'root'
+  group       'root'
+  mode        '0644'
+  variables(
+    :port => node[:jenkins][:server][:port],
+    :java_home => node[:java][:java_home]
+  )
+
+  if File.exists?("#{node[:nginx][:dir]}/sites-enabled/jenkins.conf")
+    notifies  :restart, 'service[jenkins]'
+  end
+end
+
+template "#{node[:jenkins][:server][:home]}/hudson.tasks.Maven.xml" do
+  owner       'jenkins'
+  group       'jenkins'
+  mode        '0644'
+  variables(
+    :m2label => "maven#{node[:maven][:version]}",
+    :m2home => node[:maven][:m2_home]
+  )
+end
+
 package "jenkins" do
   action :nothing
   notifies :create, "template[/etc/default/jenkins]", :immediately
+  notifies :create, "template[/etc/init/jenkins.conf]", :immediately
+  notifies :create, "template[#{node[:jenkins][:server][:home]}/hudson.tasks.Maven.xml]", :immediately
 end
 
 # restart if this run only added new plugins
@@ -198,3 +232,32 @@ if node.jenkins.iptables_allow == "enable"
     end
   end
 end
+
+
+builds = data_bag('builds')
+builds.each do | b |
+    build = data_bag_item('builds', b)
+    branch = build['branch']
+    component = build['component']
+    repository = build['repository']
+    build_on_change = build['build_on_change']
+
+    job_name = "#{component}-#{branch}"
+
+    job_config = File.join(node[:jenkins][:server][:home], "#{job_name}-config.xml")
+
+    jenkins_job job_name do
+      action :nothing
+      config job_config
+    end
+
+
+    template job_config do
+      source "#{component}-#{branch}-config.xml.erb"
+      variables :job_name => job_name, :branch => branch, :node => node[:fqdn], :repository => repository
+      notifies :update, resources(:jenkins_job => job_name), :immediately
+      notifies :build, resources(:jenkins_job => job_name), :delayed if build_on_change
+    end
+
+end
+

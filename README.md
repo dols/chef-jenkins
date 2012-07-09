@@ -69,7 +69,7 @@ Attributes
 * jenkins[:node][:ssh_private_key] - jenkins master defaults to: `~/.ssh/id_rsa` (created by the default recipe)
 * jenkins[:node][:jvm_options] - SSH slave JVM options
 * jenkins[:iptables_allow] - if iptables is enabled, add a rule passing 'jenkins[:server][:port]'
-* jenkins[:nginx][:http_proxy][:variant] - use `nginx` or `apache2` to proxy traffic to jenkins backend (`nil` by default)
+* jenkins[:http_proxy][:variant] - use `nginx` or `apache2` to proxy traffic to jenkins backend (`nil` by default)
 * jenkins[:http_proxy][:www_redirect] - add a redirect rule for 'www.*' URL requests ("disable" by default)
 * jenkins[:http_proxy][:listen_ports] - list of HTTP ports for the HTTP proxy to listen on ([80] by default)
 * jenkins[:http_proxy][:host_name] - primary vhost name for the HTTP proxy to respond to (`node[:fqdn]` by default)
@@ -116,6 +116,30 @@ Uses the nginx::source recipe from the nginx cookbook to install an HTTP fronten
 ----------------------
 
 Uses the apache2 recipe from the apache2 cookbook to install an HTTP frontend proxy. To automatically activate this recipe set the `node[:jenkins][:http_proxy][:variant]` to `apache2`.
+
+'builds' data bag
+-----------------
+
+Create a data bag called "builds" with the following attributes to specify a Jenkins job that creates an EC2 instance configured via Chef for deployment of the project's assets for testing:
+    
+    "id" = Name of the data bag item
+    "repository" = SCM URL repository (i.e. git@github.com:you/your_project)
+    "branch" = Branch to check out of SCM
+    "component" = Name of the component/project that you are building
+    "build_on_change" = true/false, whether to invoke a build after any new job is created or whether the job config changes
+    "groupId" = maven group id (optional)
+    "artifactId" = maven artifact id (optional)
+    "goal" = maven goal to run in the jenkins job
+    "roles" = a comma-seperated list of roles to run on the node (e.g. role[my_app_server],role[my_test_support])
+    "ami" = the AMI ID to provision the EC2 instance with
+    "server_size" = The EC2 server type to use (i.e. m1.small)
+    "ec2_ssh_key" = EC2's ssh server key to use
+    "ec2_security_group" = EC2 security group to configure the server's firewall with
+    "chef_bootstrap" = Chef bootstrap (i.e. ubuntu10.04-gems)
+    "ami_user" = The default user provisioned by the AMI for remote SSH login
+    "ec2_ssh_key_file" = (Yet another) SSH key access, .pem file.
+    "ec2_region" : EC2 region (i.e. us-east-1)
+
 
 'jenkins_cli' resource provider
 -------------------------------
