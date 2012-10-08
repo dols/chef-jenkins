@@ -41,6 +41,28 @@ directory "#{node[:jenkins][:server][:home]}/.ssh" do
   group node[:jenkins][:server][:group]
 end
 
+#cookbook_file "#{pkey}" do
+  #source "id_rsa"
+  #mode 0600
+  #owner node[:jenkins][:server][:user]
+  #group node[:jenkins][:server][:group]
+#end
+
+#cookbook_file "#{pkey}.pub" do
+  #source "id_rsa.pub"
+  #mode 0644
+  #owner node[:jenkins][:server][:user]
+  #group node[:jenkins][:server][:group]
+#end
+
+cookbook_file "#{node[:jenkins][:server][:home]}/.ssh/known_hosts" do
+  source "github_keys.pub"
+  mode 0644
+  owner node[:jenkins][:server][:user]
+  group node[:jenkins][:server][:group]
+end
+
+
 execute "ssh-keygen -f #{pkey} -N ''" do
   user  node[:jenkins][:server][:user]
   group node[:jenkins][:server][:group]
@@ -51,6 +73,13 @@ ruby_block "store jenkins ssh pubkey" do
   block do
     node.set[:jenkins][:server][:pubkey] = File.open("#{pkey}.pub") { |f| f.gets }
   end
+end
+
+template "#{node[:jenkins][:server][:home]}/.gitconfig" do
+  source "dot_gitconfig.erb"
+  mode 0664
+  owner node[:jenkins][:server][:user]
+  group node[:jenkins][:server][:group]
 end
 
 directory "#{node[:jenkins][:server][:home]}/plugins" do
@@ -161,7 +190,21 @@ log "jenkins: install and start" do
   end
 end
 
-template "/etc/default/jenkins"
+bound_interface = node[:jenkins][:server][:url]
+case node[:jenkins][:http_proxy][:variant]
+when "nginx","apache2"
+    bound_interface = "localhost"
+end
+node[:jenkins][:server][:url]  = "http://#{bound_interface}:#{node[:jenkins][:server][:port]}"
+
+template "/etc/default/jenkins" do
+  source "jenkins.erb"
+  owner       'root'
+  group       'root'
+  mode        '0644'
+  variables :bound_interface => bound_interface
+  notifies  :restart, 'service[jenkins]'
+end
 
 template "/etc/init/jenkins.conf" do
   source      "jenkins.conf.erb"
@@ -253,8 +296,24 @@ builds.each do | b |
 
 
     template job_config do
+      owner       'jenkins'
+      group       'jenkins'
+      mode        '0644'
       source "#{component}-#{branch}-config.xml.erb"
-      variables :job_name => job_name, :branch => branch, :node => node[:fqdn], :repository => repository
+      variables(
+        :job_name => job_name, :branch => branch, :node => node[:fqdn], :repository => repository,
+        :groupId => build['groupId'],
+        :artifactId => build['artifactId'],
+        :roles => build['roles'],
+        :goal => build['goal'],
+        :ami => build['ami'],
+        :server_size => build['server_size'],
+        :ec2_ssh_key => build['ec2_ssh_key'],
+        :ec2_security_group => build['ec2_security_group'],
+        :chef_bootstrap => build['chef_bootstrap'],
+        :ami_user => build['ami_user'],
+        :ec2_ssh_key_file => build['ec2_ssh_key_file'],
+        :ec2_region => build['ec2_region'] )
       notifies :update, resources(:jenkins_job => job_name), :immediately
       notifies :build, resources(:jenkins_job => job_name), :delayed if build_on_change
     end

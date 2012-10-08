@@ -16,5 +16,7 @@ Fix a few issues and add features:
      maven recipe is installed
  - add nginx as a dependency
  - correct README on attributes for proxy variants
+ - configure for github access via ssh
+ - bind to localhost if using any proxy
 
 
